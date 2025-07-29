@@ -1,0 +1,60 @@
+﻿@inject FinanceTracker.Services.AuthService AuthService
+@inject NavigationManager NavManager
+
+<ul class="nav flex-column">
+    <li class="nav-item">
+        <NavLink class="nav-link" href="">
+            <span class="oi oi-home"></span> Home
+        </NavLink>
+    </li>
+
+    @if (AuthService.IsLoggedIn)
+    {
+        <li class="nav-item">
+            <NavLink class="nav-link" href="@($"/profile/{AuthService.CurrentUser?.UserId}")">
+                <span class="oi oi-person"></span> Profile
+            </NavLink>
+        </li>
+        <li class="nav-item">
+            <NavLink class="nav-link" href="/transactions">
+                <span class="oi oi-list-rich"></span> Transactions
+            </NavLink>
+        </li>
+        <li class="nav-item">
+            <NavLink class="nav-link" href="/dashboard">
+                <span class="oi oi-dashboard"></span> Dashboard
+            </NavLink>
+        </li>
+        <li class="nav-item">
+            <NavLink class="nav-link" href="tags">
+                <span class="oi oi-tags"></span> Tags
+            </NavLink>
+        </li>
+        <li class="nav-item">
+            <NavLink class="nav-link" href="" @onclick="Logout">
+                <span class="oi oi-account-logout"></span> Logout
+            </NavLink>
+        </li>
+    }
+    else
+    {
+        <li class="nav-item">
+            <NavLink class="nav-link" href="login">
+                <span class="oi oi-account-login"></span> Login
+            </NavLink>
+        </li>
+        <li class="nav-item">
+            <NavLink class="nav-link" href="register">
+                <span class="oi oi-plus"></span> Register
+            </NavLink>
+        </li>
+    }
+</ul>
+
+@code {
+    private void Logout()
+    {
+        AuthService.Logout();
+        NavManager.NavigateTo("/login");
+    }
+}

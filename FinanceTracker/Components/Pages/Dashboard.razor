@@ -1,0 +1,327 @@
+﻿@page "/dashboard"
+@inject ITransactionService TransactionService
+@inject IUserService UserService
+@inject IJSRuntime JS
+
+@using FinanceTracker.Models
+@using FinanceTracker.Helpers
+@using FinanceTracker.Services
+
+<div class="container py-5">
+    <h2 class="display-6 fw-bold text-primary mb-3">Finance Dashboard</h2>
+    <p class="text-muted mb-4">Track your inflows, outflows, debts, and more — all in one place.</p>
+
+    <!-- Filters -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <InputText class="form-control" placeholder="Search by title..."
+                       @bind-Value="SearchText"
+                       @oninput="@(e => { SearchText = e.Value?.ToString() ?? string.Empty; ApplyFilter(); })" />
+        </div>
+        <div class="col-md-4">
+            <InputDate class="form-control" @bind-Value="DateFilter.StartDate"
+                       @onchange="(e => { DateFilter.StartDate = (DateTime?)e.Value; ApplyFilter(); })" />
+        </div>
+        <div class="col-md-4">
+            <InputDate class="form-control" @bind-Value="DateFilter.EndDate"
+                       @onchange="(e => { DateFilter.EndDate = (DateTime?)e.Value; ApplyFilter(); })" />
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger">@ErrorMessage</div>
+    }
+    @if (!string.IsNullOrEmpty(SuccessMessage))
+    {
+        <div class="alert alert-success">@SuccessMessage</div>
+    }
+
+    <!-- Top Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-sm-6">
+            <div class="card border-0 shadow-sm bg-success text-white text-center">
+                <div class="card-body">
+                    <h6 class="text-uppercase small">Balance</h6>
+                    <h4 class="fw-bold">@($"{CurrencySymbol}{Balance:N2}")</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="card border-0 shadow-sm bg-primary text-white text-center">
+                <div class="card-body">
+                    <h6 class="text-uppercase small">Total Inflows</h6>
+                    <h4 class="fw-bold">@($"{CurrencySymbol}{TotalInflows:N2}")</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="card border-0 shadow-sm bg-danger text-white text-center">
+                <div class="card-body">
+                    <h6 class="text-uppercase small">Total Outflows</h6>
+                    <h4 class="fw-bold">@($"{CurrencySymbol}{TotalOutflows:N2}")</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="card border-0 shadow-sm bg-warning text-white text-center">
+                <div class="card-body">
+                    <h6 class="text-uppercase small">Total Debt</h6>
+                    <h4 class="fw-bold">@($"{CurrencySymbol}{TotalDebt:N2}")</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Summary (Grid Style) -->
+    <div class="bg-light rounded p-4 mb-4 shadow-sm">
+        <h5 class="text-primary fw-bold mb-3">Financial Summary</h5>
+        <div class="row g-3">
+            <div class="col-md-3 col-sm-6">
+                <div class="bg-white border rounded p-3 text-center h-100">
+                    <small class="text-muted">Cleared Debt</small>
+                    <div class="text-success fw-bold">@($"{CurrencySymbol}{ClearedDebt:N2}")</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="bg-white border rounded p-3 text-center h-100">
+                    <small class="text-muted">Remaining Debt</small>
+                    <div class="text-danger fw-bold">@($"{CurrencySymbol}{RemainingDebt:N2}")</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="bg-white border rounded p-3 text-center h-100">
+                    <small class="text-muted">Available Balance</small>
+                    <div class="text-primary fw-bold">@($"{CurrencySymbol}{Balance:N2}")</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="bg-white border rounded p-3 text-center h-100">
+                    <small class="text-muted">Total Transactions</small>
+                    <div class="fw-bold">@FilteredTransactions.Count</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Highlighted Transactions -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            @if (HighestInflow != null)
+            {
+                <div class="alert alert-info shadow-sm">
+                    <strong>Highest Inflow:</strong> @HighestInflow.Title — <b>@($"{CurrencySymbol}{HighestInflow.Amount:N2}")</b>
+                </div>
+            }
+            @if (LowestInflow != null)
+            {
+                <div class="alert alert-info shadow-sm">
+                    <strong>Lowest Inflow:</strong> @LowestInflow.Title — <b>@($"{CurrencySymbol}{LowestInflow.Amount:N2}")</b>
+                </div>
+            }
+            @if (HighestDebt != null)
+            {
+                <div class="alert alert-danger shadow-sm">
+                    <strong>Highest Debt:</strong> @HighestDebt.Title — <b>@($"{CurrencySymbol}{HighestDebt.Amount:N2}")</b>
+                </div>
+            }
+            @if (LowestDebt != null)
+            {
+                <div class="alert alert-danger shadow-sm">
+                    <strong>Lowest Debt:</strong> @LowestDebt.Title — <b>@($"{CurrencySymbol}{LowestDebt.Amount:N2}")</b>
+                </div>
+            }
+        </div>
+        <div class="col-md-6">
+            @if (HighestOutflow != null)
+            {
+                <div class="alert alert-warning shadow-sm">
+                    <strong>Highest Outflow:</strong> @HighestOutflow.Title — <b>@($"{CurrencySymbol}{HighestOutflow.Amount:N2}")</b>
+                </div>
+            }
+            @if (LowestOutflow != null)
+            {
+                <div class="alert alert-warning shadow-sm">
+                    <strong>Lowest Outflow:</strong> @LowestOutflow.Title — <b>@($"{CurrencySymbol}{LowestOutflow.Amount:N2}")</b>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="card shadow-sm p-4 mb-5">
+        <h5 class="text-center text-secondary mb-4">Transaction Overview Charts</h5>
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <canvas id="pieChart"></canvas>
+            </div>
+            <div class="col-md-6">
+                <canvas id="barChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Debts -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="text-primary">Pending Debts</h5>
+        <button class="btn btn-outline-success"
+                @onclick="OnClearDebtsClicked"
+                disabled="@(!PendingDebts.Any())">
+            Clear All Debts
+        </button>
+    </div>
+
+    @if (PendingDebts.Any())
+    {
+        <table class="table table-striped small shadow-sm rounded">
+            <thead class="table-dark">
+                <tr>
+                    <th>Title</th>
+                    <th>Amount</th>
+                    <th>Debt Source</th>
+                    <th>Due Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var d in PendingDebts)
+                {
+                    <tr>
+                        <td>@d.Title</td>
+                        <td>@($"{CurrencySymbol}{d.Amount:N2}")</td>
+                        <td>@d.DebtSource</td>
+                        <td>@(d.DueDate?.ToShortDateString() ?? "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p class="text-muted">No pending debts.</p>
+    }
+
+    <!-- Transaction List -->
+    <h5 class="mt-4 mb-2 d-flex justify-content-between text-primary">
+        <span>Filtered Transactions</span>
+        <span class="badge bg-secondary">Total: @FilteredTransactions.Count</span>
+    </h5>
+
+    @if (FilteredTransactions.Any())
+    {
+        <table class="table table-bordered table-hover shadow-sm rounded">
+            <thead class="table-primary">
+                <tr>
+                    <th>Title</th>
+                    <th>Amount</th>
+                    <th>Type</th>
+                    <th>Date</th>
+                    <th>Cleared?</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in FilteredTransactions)
+                {
+                    <tr>
+                        <td>@t.Title</td>
+                        <td>@($"{CurrencySymbol}{t.Amount:N2}")</td>
+                        <td>@t.Type</td>
+                        <td>@t.Date.ToShortDateString()</td>
+                        <td>@(t.IsCleared ? "Yes" : "No")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p class="text-muted">No transactions found.</p>
+    }
+</div>
+
+@code {
+    private List<Transaction> Transactions = new();
+    private List<Transaction> FilteredTransactions = new();
+    private List<Transaction> PendingDebts = new();
+
+    private decimal TotalInflows, TotalOutflows, TotalDebt, Balance;
+    private decimal ClearedDebt, RemainingDebt;
+    private string CurrencySymbol = "₹";
+    private string? ErrorMessage, SuccessMessage;
+    private string SearchText = "";
+
+    private DateFilterModel DateFilter = new();
+    private Guid CurrentUserId;
+
+    private Transaction? HighestInflow, LowestInflow, HighestOutflow, LowestOutflow, HighestDebt, LowestDebt;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await UserService.GetCurrentUserAsync();
+        CurrentUserId = user?.UserId ?? Guid.Empty;
+        CurrencySymbol = CurrencyHelper.GetCurrencySymbol(user?.PreferredCurrency ?? "INR");
+
+        Transactions = await TransactionService.GetTransactionsAsync(CurrentUserId);
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        var query = Transactions.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            var txt = SearchText.ToLower();
+            query = query.Where(t => !string.IsNullOrEmpty(t.Title) && t.Title.ToLower().Contains(txt));
+        }
+
+        if (DateFilter.StartDate.HasValue)
+            query = query.Where(t => t.Date >= DateFilter.StartDate.Value);
+        if (DateFilter.EndDate.HasValue)
+            query = query.Where(t => t.Date <= DateFilter.EndDate.Value);
+
+        FilteredTransactions = query.ToList();
+
+        TotalInflows = FilteredTransactions.Where(t => t.Type == TransactionType.Credit).Sum(t => t.Amount);
+        TotalOutflows = FilteredTransactions.Where(t => t.Type == TransactionType.Debit).Sum(t => t.Amount);
+        TotalDebt = FilteredTransactions.Where(t => t.Type == TransactionType.Debt).Sum(t => t.Amount);
+        ClearedDebt = FilteredTransactions.Where(t => t.Type == TransactionType.Debt && t.IsCleared).Sum(t => t.Amount);
+        RemainingDebt = TotalDebt - ClearedDebt;
+        Balance = Math.Max(TotalInflows - TotalOutflows, 0);
+
+        PendingDebts = FilteredTransactions.Where(t => t.Type == TransactionType.Debt && !t.IsCleared).ToList();
+
+        HighestInflow = FilteredTransactions.Where(t => t.Type == TransactionType.Credit).OrderByDescending(t => t.Amount).FirstOrDefault();
+        LowestInflow = FilteredTransactions.Where(t => t.Type == TransactionType.Credit).OrderBy(t => t.Amount).FirstOrDefault();
+        HighestOutflow = FilteredTransactions.Where(t => t.Type == TransactionType.Debit).OrderByDescending(t => t.Amount).FirstOrDefault();
+        LowestOutflow = FilteredTransactions.Where(t => t.Type == TransactionType.Debit).OrderBy(t => t.Amount).FirstOrDefault();
+        HighestDebt = FilteredTransactions.Where(t => t.Type == TransactionType.Debt).OrderByDescending(t => t.Amount).FirstOrDefault();
+        LowestDebt = FilteredTransactions.Where(t => t.Type == TransactionType.Debt).OrderBy(t => t.Amount).FirstOrDefault();
+
+        _ = JS.InvokeVoidAsync("drawPieChart", new[] { "Inflows", "Outflows", "Debt" }, new[] { TotalInflows, TotalOutflows, TotalDebt });
+        _ = JS.InvokeVoidAsync("drawBarChart", FilteredTransactions.Take(5).Select(t => t.Title).ToArray(), FilteredTransactions.Take(5).Select(t => t.Amount).ToArray());
+
+        StateHasChanged();
+    }
+
+    private async Task OnClearDebtsClicked()
+    {
+        if (PendingDebts.Sum(d => d.Amount) > Balance)
+        {
+            ErrorMessage = "Insufficient balance to clear all debts.";
+            SuccessMessage = null;
+            return;
+        }
+
+        await TransactionService.ClearPendingDebtsAsync(CurrentUserId);
+        Transactions = await TransactionService.GetTransactionsAsync(CurrentUserId);
+        SuccessMessage = "Debts cleared successfully!";
+        ErrorMessage = null;
+        ApplyFilter();
+    }
+
+    public class DateFilterModel
+    {
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+    }
+}

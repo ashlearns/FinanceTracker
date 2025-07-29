@@ -1,0 +1,75 @@
+﻿@page "/profile"
+@inject IUserService UserService
+
+@using FinanceTracker.Models
+@using FinanceTracker.Services
+
+<div class="container py-5">
+    <h2 class="text-primary mb-4">User Profile</h2>
+
+    @if (!string.IsNullOrEmpty(SuccessMessage))
+    {
+        <div class="alert alert-success">@SuccessMessage</div>
+    }
+
+    @if (User == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <EditForm Model="User" OnValidSubmit="SaveProfile">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Username</label>
+                    <InputText class="form-control" @bind-Value="User.Username" />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Password</label>
+                    <InputText class="form-control" @bind-Value="User.Password" type="password" />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Preferred Currency</label>
+                    <InputSelect class="form-select" @bind-Value="User.PreferredCurrency">
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="INR">INR</option>
+                        <option value="NPR">NPR</option>
+                    </InputSelect>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-success">Save Changes</button>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private User? User;
+    private string? SuccessMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        User = await UserService.GetCurrentUserAsync();
+    }
+
+    private async Task SaveProfile()
+    {
+        if (User != null)
+        {
+            await UserService.SaveUserAsync(User);
+            SuccessMessage = "Profile updated successfully!";
+        }
+    }
+}
