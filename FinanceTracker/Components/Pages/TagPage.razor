@@ -1,0 +1,63 @@
+﻿@page "/tags"
+@using FinanceTracker.Models
+@using FinanceTracker.Services
+@inject ITagService TagService
+@inject IUserService UserService
+
+<div class="container py-5">
+    <h2 class="text-primary mb-4">My Tags</h2>
+
+    @if (Tags == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (!Tags.Any())
+    {
+        <div class="alert alert-info">No tags defined yet. Start by adding some transactions with tags!</div>
+    }
+    else
+    {
+        <table class="table table-bordered table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Name</th>
+                    <th>Default?</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var tag in Tags)
+                {
+                    <tr>
+                        <td>@tag.Name</td>
+                        <td>
+                            @if (tag.IsDefault)
+                            {
+                                <span class="badge bg-success">Yes</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">No</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<Tag>? Tags;
+    private Guid CurrentUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await UserService.GetCurrentUserAsync();
+        CurrentUserId = user?.UserId ?? Guid.Empty;
+        Tags = await TagService.GetAllTagsAsync(CurrentUserId);
+    }
+}

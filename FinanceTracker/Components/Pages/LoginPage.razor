@@ -1,0 +1,72 @@
+﻿@page "/login"
+@inject FinanceTracker.Services.IUserService UserService
+@inject FinanceTracker.Services.AuthService AuthService
+@inject NavigationManager NavManager
+
+<div class="container d-flex justify-content-center align-items-center min-vh-100">
+    <div class="card shadow p-4" style="max-width: 400px; width: 100%;">
+        <h3 class="text-center mb-4">Login</h3>
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="alert alert-danger">@ErrorMessage</div>
+        }
+
+        <EditForm Model="Credentials" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                    <InputText class="form-control" @bind-Value="Credentials.Username" placeholder="Enter username" />
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                    <InputText type="password" class="form-control" @bind-Value="Credentials.Password" placeholder="Enter password" />
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Login</button>
+        </EditForm>
+
+        <div class="text-center mt-3">
+            <span>New here?</span>
+            <a href="/register">Register</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginModel Credentials = new();
+    private string? ErrorMessage;
+
+    private async Task HandleLogin()
+    {
+        var allUsers = await UserService.GetAllUsersAsync();
+        var user = allUsers.FirstOrDefault(u =>
+            u.Username.Equals(Credentials.Username, StringComparison.OrdinalIgnoreCase)
+            && u.Password == Credentials.Password);
+
+        if (user != null)
+        {
+            AuthService.Login(user);
+            NavManager.NavigateTo("/");
+        }
+        else
+        {
+            ErrorMessage = "Invalid username or password.";
+        }
+    }
+
+    public class LoginModel
+    {
+        public string Username { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+}

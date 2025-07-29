@@ -1,0 +1,461 @@
+﻿@page "/transactions"
+@inject ITransactionService TransactionService
+@inject ITagService TagService
+@inject IUserService UserService
+
+@using FinanceTracker.Helpers
+@using FinanceTracker.Models
+@using FinanceTracker.Services
+@using Microsoft.AspNetCore.Components.Forms
+
+<div class="container py-4">
+    <h2 class="text-primary mb-4">Transactions</h2>
+
+    @if (!string.IsNullOrEmpty(SuccessMessage))
+    {
+        <div class="alert alert-success">@SuccessMessage</div>
+    }
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger">@ErrorMessage</div>
+    }
+
+    <div class="row">
+        <!-- Transaction Form -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <EditForm Model="@Transaction" OnValidSubmit="SaveTransaction">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Title</label>
+                                <InputText class="form-control" @bind-Value="Transaction.Title" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Amount</label>
+                                <InputNumber class="form-control" @bind-Value="Transaction.Amount" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Type</label>
+                                <InputSelect class="form-select" @bind-Value="Transaction.Type">
+                                    @foreach (var type in Enum.GetValues(typeof(TransactionType)))
+                                    {
+                                        <option value="@type">@type</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Tags:</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var tag in AvailableTags)
+                                {
+                                    <div class="form-check form-check-inline">
+                                        <input type="checkbox" class="form-check-input"
+                                               checked="@Transaction.Tags.Contains(tag.Name)"
+                                               @onchange="@((e) => OnTagChanged(tag.Name, e))" />
+                                        <label class="form-check-label">@tag.Name</label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Add Custom Tag:</label>
+                                <div class="input-group">
+                                    <InputText class="form-control" @bind-Value="CustomTag" />
+                                    <button class="btn btn-outline-primary" type="button" @onclick="AddCustomTag">Add Tag</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Note</label>
+                            <InputTextArea class="form-control" @bind-Value="Transaction.Note" rows="3" />
+                        </div>
+
+                        @if (Transaction.Type == TransactionType.Debt)
+                        {
+                            <div class="alert alert-warning">Please provide Debt Source and Due Date.</div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Debt Source</label>
+                                    <InputText class="form-control" @bind-Value="Transaction.DebtSource" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Due Date</label>
+                                    <InputDate class="form-control" @bind-Value="Transaction.DueDate" />
+                                </div>
+                            </div>
+                        }
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">
+                                @(Transaction.Id == Guid.Empty ? "Add Transaction" : "Update Transaction")
+                            </button>
+                            @if (Transaction.Id != Guid.Empty)
+                            {
+                                <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Cancel</button>
+                            }
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Panel -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body">
+                    <h6 class="text-muted">Account Summary</h6>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">Balance <span class="fw-bold">@($"{CurrentBalance:N2}")</span></li>
+                        <li class="list-group-item d-flex justify-content-between">Inflows <span>@($"{TotalInflow:N2}")</span></li>
+                        <li class="list-group-item d-flex justify-content-between">Outflows <span>@($"{TotalOutflow:N2}")</span></li>
+                        <li class="list-group-item d-flex justify-content-between">Debt <span>@($"{TotalDebt:N2}")</span></li>
+                        <li class="list-group-item d-flex justify-content-between">Cleared Debt <span>@($"{ClearedDebt:N2}")</span></li>
+                        <li class="list-group-item d-flex justify-content-between">Remaining Debt <span>@($"{RemainingDebt:N2}")</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr />
+
+    <!-- Filters -->
+    <h4 class="mt-4">Search, Filter & Sort</h4>
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <InputText class="form-control" placeholder="Search by title..." @bind-Value="SearchText" @oninput="OnSearchChanged" />
+        </div>
+        <div class="col-md-3">
+            <InputSelect class="form-select" @bind-Value="SelectedType">
+                <option value="">All Types</option>
+                @foreach (var type in Enum.GetValues(typeof(TransactionType)))
+                {
+                    <option value="@type">@type</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="col-md-3">
+            <InputSelect class="form-select" @bind-Value="SelectedTag">
+                <option value="">All Tags</option>
+                @foreach (var tag in AvailableTags)
+                {
+                    <option value="@tag.Name">@tag.Name</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="col-md-3">
+            <InputSelect class="form-select" @bind-Value="SortBy">
+                <option value="">Sort By</option>
+                <option value="Title">Title</option>
+                <option value="Amount">Amount</option>
+                <option value="Date">Date</option>
+            </InputSelect>
+        </div>
+    </div>
+
+    <!-- Table -->
+    @if (FilteredTransactions?.Any() == true)
+    {
+        <table class="table table-bordered table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>Title</th>
+                    <th>Amount</th>
+                    <th>Type</th>
+                    <th>Tags</th>
+                    <th>Note</th>
+                    <th>Date</th>
+                    <th>Debt Source</th>
+                    <th>Due Date</th>
+                    <th>Cleared?</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in FilteredTransactions)
+                {
+                    <tr>
+                        <td>@t.Title</td>
+                        <td>@($"{CurrencySymbol}{t.Amount:N2}")</td>
+                        <td>@t.Type</td>
+                        <td>@foreach (var tag in t.Tags) {
+                        <span class="me-1">@tag</span>
+                    }
+    </td>
+                    <td>@t.Note</td>
+                    <td>@t.Date.ToShortDateString()</td>
+                    <td>@t.DebtSource</td>
+                    <td>@(t.DueDate?.ToShortDateString() ?? "-")</td>
+                    <td>@(t.IsCleared ? "Yes" : "No")</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning me-1" @onclick="@(() => EditTransaction(t))">Edit</button>
+                        <button class="btn btn-sm btn-danger" @onclick="@(() => DeleteTransaction(t))">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+        }
+        else
+    {
+        <p class="text-muted">No transactions found.</p>
+    }
+</div>
+
+
+
+@code {
+    private Transaction Transaction = new();
+    private List<Transaction> Transactions = new();
+    private List<Transaction> FilteredTransactions = new();
+    private List<Tag> AvailableTags = new();
+    private string CustomTag = "";
+    private Guid CurrentUserId = Guid.Empty;
+    private string CurrencySymbol = "$";
+    private string? SuccessMessage;
+    private string? ErrorMessage;
+
+    private string? SearchText { get; set; } = "";
+
+    private string? _selectedType;
+    private string? SelectedType
+    {
+        get => _selectedType;
+        set
+        {
+            _selectedType = value;
+            ApplyFilters();
+        }
+    }
+
+    private string? _selectedTag;
+    private string? SelectedTag
+    {
+        get => _selectedTag;
+        set
+        {
+            _selectedTag = value;
+            ApplyFilters();
+        }
+    }
+
+    private string? _sortBy;
+    private string? SortBy
+    {
+        get => _sortBy;
+        set
+        {
+            _sortBy = value;
+            ApplyFilters();
+        }
+    }
+
+    private decimal TotalInflow => Transactions.Where(t => t.Type == TransactionType.Credit).Sum(t => t.Amount);
+    private decimal TotalOutflow => Transactions.Where(t => t.Type == TransactionType.Debit).Sum(t => t.Amount);
+    private decimal TotalDebt => Transactions.Where(t => t.Type == TransactionType.Debt).Sum(t => t.Amount);
+    private decimal RemainingDebt => Transactions.Where(t => t.Type == TransactionType.Debt && !t.IsCleared).Sum(t => t.Amount);
+    private decimal ClearedDebt => TotalDebt - RemainingDebt;
+    private decimal CurrentBalance => TotalInflow - TotalOutflow - RemainingDebt;
+
+    private Transaction? HighestInflow => Transactions.Where(t => t.Type == TransactionType.Credit).OrderByDescending(t => t.Amount).FirstOrDefault();
+    private Transaction? HighestOutflow => Transactions.Where(t => t.Type == TransactionType.Debit).OrderByDescending(t => t.Amount).FirstOrDefault();
+    private Transaction? HighestDebt => Transactions.Where(t => t.Type == TransactionType.Debt).OrderByDescending(t => t.Amount).FirstOrDefault();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await UserService.GetCurrentUserAsync();
+        CurrentUserId = user?.UserId ?? Guid.Empty;
+        CurrencySymbol = CurrencyHelper.GetCurrencySymbol(user?.PreferredCurrency ?? "USD");
+        AvailableTags = await TagService.GetAllTagsAsync(CurrentUserId);
+        Transactions = await TransactionService.GetTransactionsAsync(CurrentUserId);
+        ApplyFilters();
+        ResetTransaction();
+    }
+
+    private async Task SaveTransaction()
+    {
+        try
+        {
+            Transaction.UserId = CurrentUserId;
+            Transaction.Date = DateTime.Now;
+
+            if (Transaction.Type == TransactionType.Debit && Transaction.Amount > CurrentBalance)
+            {
+                ErrorMessage = "Insufficient balance for this outflow.";
+                return;
+            }
+
+            if (Transaction.Type == TransactionType.Credit)
+            {
+                foreach (var debt in Transactions.Where(d => d.Type == TransactionType.Debt && !d.IsCleared).OrderBy(d => d.Date))
+                {
+                    if (Transaction.Amount >= debt.Amount)
+                    {
+                        Transaction.Amount -= debt.Amount;
+                        debt.IsCleared = true;
+                        await TransactionService.UpdateTransactionAsync(debt);
+                    }
+                    else
+                    {
+                        debt.Amount -= Transaction.Amount;
+                        await TransactionService.UpdateTransactionAsync(debt);
+                        Transaction.Amount = 0;
+                        break;
+                    }
+                }
+            }
+
+            if (Transaction.Id == Guid.Empty)
+            {
+                Transaction.Id = Guid.NewGuid();
+                await TransactionService.AddTransactionAsync(Transaction);
+                Transactions.Add(Transaction);
+                SuccessMessage = "Transaction added!";
+            }
+            else
+            {
+                await TransactionService.UpdateTransactionAsync(Transaction);
+                Transactions = Transactions.Where(t => t.Id != Transaction.Id).ToList();
+                Transactions.Add(Transaction);
+                SuccessMessage = "Transaction updated!";
+            }
+
+            ApplyFilters();
+            ResetTransaction();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private void EditTransaction(Transaction t)
+    {
+        Transaction = new Transaction
+        {
+            Id = t.Id,
+            Title = t.Title,
+            Amount = t.Amount,
+            Type = t.Type,
+            Tags = new List<string>(t.Tags),
+            Note = t.Note,
+            DebtSource = t.DebtSource,
+            DueDate = t.DueDate,
+            IsCleared = t.IsCleared,
+            UserId = t.UserId,
+            Date = t.Date
+        };
+    }
+
+    private void CancelEdit() => ResetTransaction();
+
+    private void ResetTransaction()
+    {
+        Transaction = new Transaction
+        {
+            Id = Guid.Empty,
+            Tags = new List<string>()
+        };
+        CustomTag = "";
+        ErrorMessage = null;
+        SuccessMessage = null;
+    }
+
+    private async Task AddCustomTag()
+    {
+        if (!string.IsNullOrWhiteSpace(CustomTag))
+        {
+            var newTag = new Tag
+            {
+                Name = CustomTag,
+                UserID = CurrentUserId,
+                IsDefault = false,
+                TagType = "Custom"
+            };
+
+            await TagService.AddTagAsync(newTag);
+            AvailableTags.Add(newTag);
+            Transaction.Tags.Add(CustomTag);
+            CustomTag = "";
+            ApplyFilters();
+        }
+    }
+
+    private void OnTagChanged(string tagName, ChangeEventArgs e)
+    {
+        if (bool.TryParse(e.Value?.ToString(), out bool isChecked))
+        {
+            ToggleTag(tagName, isChecked);
+        }
+    }
+
+    private void ToggleTag(string tagName, bool isChecked)
+    {
+        if (isChecked)
+        {
+            if (!Transaction.Tags.Contains(tagName))
+                Transaction.Tags.Add(tagName);
+        }
+        else
+        {
+            Transaction.Tags.Remove(tagName);
+        }
+    }
+
+    private async Task DeleteTransaction(Transaction t)
+    {
+        await TransactionService.DeleteTransactionAsync(t);
+        Transactions = Transactions.Where(x => x.Id != t.Id).ToList();
+        ApplyFilters();
+    }
+
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        SearchText = e.Value?.ToString() ?? "";
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        var query = Transactions.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            var text = SearchText.Trim().ToLower();
+            query = query.Where(t => !string.IsNullOrWhiteSpace(t.Title) && t.Title.ToLower().Contains(text));
+        }
+
+        if (!string.IsNullOrWhiteSpace(SelectedType) && Enum.TryParse<TransactionType>(SelectedType, out var type))
+        {
+            query = query.Where(t => t.Type == type);
+        }
+
+        if (!string.IsNullOrWhiteSpace(SelectedTag))
+        {
+            query = query.Where(t => t.Tags.Contains(SelectedTag));
+        }
+
+        if (!string.IsNullOrWhiteSpace(SortBy))
+        {
+            query = SortBy switch
+            {
+                "Title" => query.OrderBy(t => t.Title),
+                "Amount" => query.OrderByDescending(t => t.Amount),
+                "Date" => query.OrderByDescending(t => t.Date),
+                _ => query
+            };
+        }
+
+        FilteredTransactions = query.ToList();
+        StateHasChanged();
+    }
+}

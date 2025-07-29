@@ -1,0 +1,59 @@
+﻿@page "/"
+@inject NavigationManager NavManager
+
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <h1 class="display-4 fw-bold text-primary">Welcome to Finance Tracker</h1>
+        <p class="lead text-muted">Track expenses, debts, and manage your financial health with ease.</p>
+    </div>
+
+    <div class="row g-4">
+        <!-- Transactions Card -->
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-primary">
+                <div class="card-body text-center">
+                    <i class="bi bi-wallet2 display-3 text-primary mb-3" role="img" aria-label="Wallet Icon"></i>
+                    <h5 class="card-title fw-semibold">Track Your Expenses</h5>
+                    <p class="card-text text-muted">Record cash inflows, outflows, notes, tags, and categories.</p>
+                    <button class="btn btn-primary w-100 mt-2" @onclick="GoToTransactions">
+                        Manage Transactions
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Card -->
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-success">
+                <div class="card-body text-center">
+                    <i class="bi bi-bar-chart-line display-3 text-success mb-3" role="img" aria-label="Chart Icon"></i>
+                    <h5 class="card-title fw-semibold">Analyze Your Spending</h5>
+                    <p class="card-text text-muted">Explore insights, view debts, and monitor cash flow trends.</p>
+                    <button class="btn btn-success w-100 mt-2" @onclick="GoToDashboard">
+                        View Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Card -->
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-info">
+                <div class="card-body text-center">
+                    <i class="bi bi-person-circle display-3 text-info mb-3" role="img" aria-label="Profile Icon"></i>
+                    <h5 class="card-title fw-semibold">Manage Your Profile</h5>
+                    <p class="card-text text-muted">Update your personal info and preferred currency settings.</p>
+                    <button class="btn btn-info w-100 mt-2 text-white" @onclick="GoToProfile">
+                        Go to Profile
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    void GoToTransactions() => NavManager.NavigateTo("/transactions");
+    void GoToDashboard() => NavManager.NavigateTo("/dashboard");
+    void GoToProfile() => NavManager.NavigateTo("/profile");
+}
