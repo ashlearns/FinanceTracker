@@ -20,8 +20,8 @@ FinanceTracker is a Blazor-based personal finance tracking web application that 
 
 🔐 Login Credentials
 
-Default Username**: `anu`  
-Default Password**: `shres`
+Default Username: `anu`  
+Default Password: `shres`
 
 
 
